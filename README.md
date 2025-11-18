@@ -25,8 +25,6 @@ Częstotliwość pojawiania się elementów rośnie wraz z czasem gry
 Pozytywne elementy dodają punkty lub czas
 Negatywne elementy zabierają punkty lub sekundy
 
-System jest prosty, szybki i dynamiczny — idealny do krótkich sesji.
-
 📁 Struktura projektu
 RightRun/
 │
@@ -61,4 +59,5 @@ Po zakończeniu gry pojawi się link do LinkedIna, np.:
 👨‍💻 Autor
 Autorem gry jest Appila - Piotr Pilarski.
 Projekt powstał przy okazji nauki JS i CSS.
-Gra wspiera działania marketingowe partnera technologicznego - firmy Rightcode Tomasz Wieczorek.
+Gra została napisana w aplikacji Replit.
+RightRun wspiera działania marketingowe partnera technologicznego - firmy Rightcode Tomasz Wieczorek.

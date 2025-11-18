@@ -1,134 +1,188 @@
-body {
-  margin: 0;
-  font-family: 'Montserrat', sans-serif;
-  background-color: #020617;
-  color: #F7F7F8;
-  height: 100vh;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
+// RightRun Game Script
+let timeLeft = 60, fallSpeed = 4, score = 0, playerSize, gameRunning = false, paused = false, floatingText = null;
+let gameInterval, spawnInterval, timerInterval, leftPressed = false, rightPressed = false;
+let spawnRate = 1000, spawnDecreaseRate = 90;
+
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+const startScreen = document.getElementById("start-screen");
+const startBtn = document.getElementById("start-btn");
+const gameOverScreen = document.getElementById("game-over-screen");
+const scoreDisplay = document.getElementById("score-display");
+const finalScore = document.getElementById("final-score");
+const shareLink = document.querySelector(".game-link");
+const timerDisplay = document.getElementById("timer-display");
+
+function resizeCanvas() {
+  canvas.width = canvas.offsetWidth;
+  canvas.height = canvas.offsetHeight;
+  playerSize = canvas.height * 0.08 * 1.1;
+  player = { x: canvas.width / 2 - playerSize / 2, y: canvas.height - playerSize - 10, width: playerSize, height: playerSize };
 }
 
-h1 {
-  margin-bottom: 10px;
+window.addEventListener("resize", resizeCanvas);
+setTimeout(resizeCanvas, 50);
+
+canvas.addEventListener("touchstart", handleTouch);
+canvas.addEventListener("touchmove", handleTouch);
+
+function handleTouch(e) {
+  const touch = e.touches[0];
+  player.x = touch.clientX - player.width / 2;
 }
 
-.game-wrapper {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding: 16px;
-  width: 90vw;
-  max-width: 500px;
-  height: 70vh;
-  max-height: 700px;
-  position: relative;
-  justify-content: center;
+document.addEventListener("keydown", e => { 
+  if (e.code === "ArrowLeft") leftPressed = true; 
+  if (e.code === "ArrowRight") rightPressed = true; 
+  if (e.code === "KeyP") paused = !paused; 
+});
+document.addEventListener("keyup", e => { 
+  if (e.code === "ArrowLeft") leftPressed = false; 
+  if (e.code === "ArrowRight") rightPressed = false; 
+});
+
+function drawPlayer() { 
+  ctx.font = `${playerSize}px Arial`; 
+  ctx.fillText("🧑‍💼", player.x, player.y + player.height); 
 }
 
-#start-screen,
-#game-over-screen {
-  display: none;
-  position: absolute;
-  width: 100%;
-  height: 100%;
-  z-index: 2;
-  background-color: rgba(2, 6, 23, 0.95);
-  color: #F7F7F8;
-  text-align: center;
-  padding: 40px 20px;
+function drawObjects() {
+  ctx.font = `${playerSize * 0.70}px Arial`;
+  fallingObjects.forEach(obj => {
+    ctx.fillStyle = obj.color;
+    ctx.fillText(obj.icon, obj.x, obj.y);
+  });
 }
 
-#start-screen.active,
-#game-over-screen.active {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
+function updateObjects() {
+  for (let i = 0; i < fallingObjects.length;) {
+    const obj = fallingObjects[i];
+    obj.y += fallSpeed;
+    if (obj.y > canvas.height) { fallingObjects.splice(i, 1); continue; }
+
+    const emojiHeight = playerSize, emojiY = obj.y - emojiHeight;
+    const emojiLeft = obj.x, emojiRight = obj.x + playerSize, emojiTop = emojiY, emojiBottom = emojiY + playerSize;
+    const playerLeft = player.x, playerRight = player.x + player.width, playerTop = player.y, playerBottom = player.y + player.height;
+
+    if (emojiRight > playerLeft && emojiLeft < playerRight && emojiBottom > playerTop && emojiTop < playerBottom) {
+      let floatingMsg;
+      if (obj.timeBonus) { timeLeft += obj.timeBonus; floatingMsg = `+${obj.timeBonus}s`; }
+      else if (obj.timePenalty) { timeLeft += obj.timePenalty; floatingMsg = `${obj.timePenalty}s`; }
+      else { score += obj.value; floatingMsg = obj.value > 0 ? `+${obj.value}` : `${obj.value}`; }
+
+      floatingText = { text: floatingMsg, color: obj.value > 0 || obj.timeBonus ? "#4DC614" : "#FF0000", alpha: 1, scale: 0, x: canvas.width / 2, y: canvas.height / 2, timer: 30 };
+      fallingObjects.splice(i, 1);
+      continue;
+    }
+    i++;
+  }
 }
 
-#start-btn,
-.restart-btn {
-  margin-top: 20px;
-  padding: 12px 24px;
-  font-size: 18px;
-  background-color: #165DFB;
-  color: white;
-  border: none;
-  border-radius: 8px;
-  cursor: pointer;
+function drawFloatingPoints() {
+  if (floatingText && floatingText.timer > 0) {
+    const scaleFactor = 1 + (1 - floatingText.alpha) * 1.5;
+    ctx.font = `${Math.round(48 * scaleFactor)}px Arial`;
+    const textWidth = ctx.measureText(floatingText.text).width;
+    const xPos = (canvas.width - textWidth) / 2;
+    ctx.globalAlpha = floatingText.alpha;
+    ctx.fillStyle = floatingText.color;
+    ctx.fillText(floatingText.text, xPos, floatingText.y);
+    ctx.globalAlpha = 1;
+
+    floatingText.timer--;
+    floatingText.alpha -= 0.03;
+    if (floatingText.timer <= 0) floatingText = null;
+  }
 }
 
-button:hover {
-  background-color: #0444D3;
+function drawScore() { 
+  scoreDisplay.textContent = `Wynik: ${score}`; 
 }
 
-#gameCanvas {
-  background-color: #0E172B;
-  border: 2px solid #165DFB;
-  border-radius: 12px;
-  width: 90vw;
-  aspect-ratio: 1 / 1.3;
-  max-width: 500px;
-  display: none;
+function gameLoop() {
+  if (!gameRunning || paused) return;
+  if (leftPressed) player.x = Math.max(0, player.x - 15);
+  if (rightPressed) player.x = Math.min(canvas.width - player.width, player.x + 15);
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  updateObjects();
+  drawPlayer();
+  drawObjects();
+  drawScore();
+  drawFloatingPoints();
 }
 
-#score-display,
-#timer-display {
-  font-size: 22px;
-  font-weight: bold;
-  background-color: #ffffff12;
-  padding: 8px 16px;
-  border-radius: 8px;
-  color: #F7F7F8;
+function spawnObject() {
+  const items = [
+    { icon: "💰", value: 2, color: "#4DC614" },
+    { icon: "🎯", value: 1, color: "#4DC614" },
+    { icon: "🤝", value: 3, color: "#4DC614" },
+    { icon: "🕑", value: 0, color: "#4DC614", timeBonus: 2 },
+    { icon: "🔥", value: 0, color: "#FF0000", timePenalty: -2 },
+    { icon: "📛", value: -2, color: "#FF0000" },
+    { icon: "💣", value: -4, color: "#FF0000" }
+  ];
+  const obj = items[Math.floor(Math.random() * items.length)];
+  obj.x = Math.random() * (canvas.width - playerSize);
+  obj.y = 0;
+  fallingObjects.push(obj);
 }
 
-#floating-points {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 48px;
-  font-weight: bold;
-  color: #4DC614;
-  opacity: 0;
-  transition: all 0.3s ease-out;
-  pointer-events: none;
-  z-index: 3;
+function endGame() {
+  clearInterval(timerInterval);
+  clearInterval(spawnInterval);
+  clearInterval(gameInterval);
+  gameRunning = false;
+  gameOverScreen.classList.add("active");
+  finalScore.textContent = `Twój wynik: ${score} punktów!`;
+  shareLink.href = `https://www.linkedin.com/shareArticle?mini=true&url=https://rightcode.pl/game&title=Zagraj w RightRun!&summary=Zebrałem ${score} punktów. A Ty?`;
+
+  spawnRate = 600;
+  spawnDecreaseRate = 30;
 }
 
-a.game-link {
-  color: #4DC614 !important;
-  font-weight: bold;
-  font-size: 16px;
-  text-decoration: none !important;
-  margin-top: 20px;
-  display: inline-block;
+function startGame() {
+  // Resetowanie zmiennych do wartości początkowych
+  setTimeout(resizeCanvas, 50);
+  score = 0;
+  timeLeft = 60;
+  fallSpeed = 4;
+  fallingObjects = []; // Opróżniamy tablicę obiektów spadających
+  gameRunning = true;
+  paused = false;
+
+  // Resetowanie ekranów
+  startScreen.classList.remove("active");
+  gameOverScreen.classList.remove("active");
+  canvas.style.display = scoreDisplay.style.display = "block";
+
+  spawnRate = 1000;  
+  spawnDecreaseRate = 90;
+
+  gameInterval = setInterval(gameLoop, 50);
+  spawnInterval = setInterval(spawnObject, spawnRate);
+
+  timerInterval = setInterval(() => {
+    timeLeft--;
+    timerDisplay.textContent = `Czas: ${timeLeft}`;
+    if (timeLeft <= 0) endGame();
+
+    if (timeLeft % 10 === 0 && spawnRate > 300) {
+      spawnRate -= spawnDecreaseRate;
+      clearInterval(spawnInterval);
+      spawnInterval = setInterval(spawnObject, spawnRate);
+    }
+  }, 1000);
+
+  setInterval(() => { 
+    if (fallSpeed < 18) fallSpeed += 0.20; 
+  }, 1000);
 }
 
-a.game-link:hover {
-  text-decoration: underline !important;
-}
+startBtn.onclick = startGame;
 
-.info-panel {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  align-items: center;
-}
-
-.info-panel div {
-  font-size: 22px;
-  font-weight: bold;
-  background-color: #1E293B;
-  color: #F7F7F8;
-  padding: 6px 12px;
-  border-radius: 8px;
-  min-width: 120px;
-  text-align: center;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
+document.getElementById("restart-btn").addEventListener("click", () => {
+  startGame();
+  gameOverScreen.classList.remove("active");
+  startScreen.classList.remove("active");
+});
